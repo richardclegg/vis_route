@@ -7,3 +7,12 @@ usage -- just give an IP address
 ./vis_route.py 123.45.67.89
 
 
+You will need to install 
+gcmap for great circle drawing
+https://pypi.org/project/gcmap/
+
+Matplot lib
+https://matplotlib.org/users/installing.html
+
+mpl_toolkits for mapping.
+https://matplotlib.org/basemap/
