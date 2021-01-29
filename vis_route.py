@@ -71,7 +71,9 @@ for line in proc.stdout:
         continue
     if lastLat != None and (lastLat-lat + lastLon-lon) != 0.0:
         #print(lastLat,lastLon,lat,lon)
-        line, = m.drawgreatcircle(lastLon,lastLat,lon,lat,color='r')
+        x,y = m(lon,lat)
+        m.scatter(x,y,10,marker='o',color='r')
+        line, = m.drawgreatcircle(lastLon,lastLat,lon,lat,color='b')
     lastLat= lat
     lastLon= lon
 
