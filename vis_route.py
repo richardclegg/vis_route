@@ -43,7 +43,7 @@ def get_location(ip_address: str) -> Union[Tuple[float, float], Tuple[None, None
     return result
 
 
-def print_help():
+def print_help() -> None:
     print("./vis_route.py IPv4Address")
     print(" e.g. ./vis_route.py 213.138.111.222")
     
@@ -101,7 +101,7 @@ def trace_route(ip_address: str) -> None:
     plt.show()
 
 
-def main():
+def main() -> None:
     
     try:
         opts, args = getopt.getopt(sys.argv, "h")
