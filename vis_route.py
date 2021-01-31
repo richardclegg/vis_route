@@ -63,12 +63,12 @@ if platform.system() == 'Linux' or platform.system() == 'Darwin':
     for line in proc.stdout:
         print(line,end="")
         hopIP=line.split()[1]
-        if hopIP == "*" or hopIP == "to":
+        if hopIP in ("*" , "to"):
             continue
         (lat,lon)=getLoc(hopIP)
-        if (lat == None):
+        if (lat is None):
             continue
-        if lastLat != None and (lastLat-lat + lastLon-lon) != 0.0:
+        if lastLat is not None and (lastLat-lat + lastLon-lon) != 0.0:
             #print(lastLat,lastLon,lat,lon)
             x,y = m(lon,lat)
             m.scatter(x,y,10,marker='o',color='r')
@@ -93,12 +93,12 @@ elif platform.system() == 'Windows':
             continue
         else:
             hopIP=line.split()[7]
-            if hopIP == "*" or hopIP == "to":
+            if hopIP in ("*" , "to"):
                 continue
             (lat,lon)=getLoc(hopIP)
-            if (lat == None):
+            if (lat is None):
                 continue
-            if lastLat != None and (lastLat-lat + lastLon-lon) != 0.0:
+            if lastLat is not None and (lastLat-lat + lastLon-lon) != 0.0:
                 x,y = m(lon,lat)
                 m.scatter(x,y,10,marker='o',color='r')
                 line, = m.drawgreatcircle(lastLon,lastLat,lon,lat,color='b')
@@ -109,4 +109,4 @@ elif platform.system() == 'Windows':
     plt.show()
 else:
     print("Sorry, this python program does not have support for your current operating system!")
-    exit()
+    sys.exit(-1)
