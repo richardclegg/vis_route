@@ -1,112 +1,125 @@
 #!/usr/bin/env python3
 
-import urllib.request
-import json
-import os, sys, platform
+# Standard library
 import getopt
+import json
+import platform
 import subprocess
-from mpl_toolkits.basemap import Basemap
+import sys
+import urllib.request
+
+from pathlib import Path
+from typing import Tuple, Union
+
+# Third-party
 import matplotlib.pyplot as plt
+
 from gcmap import GCMapper
+from mpl_toolkits.basemap import Basemap
+
+
 gcm = GCMapper()
 
 
-def getLoc(IP):
+def get_location(ip_address: str) -> Union[Tuple[float, float], Tuple[None, None]]:
     "Turn a string representing an IP address into a lat long pair"
+    
     #Other geolocation services are available
-    url = "https://geolocation-db.com/json/"+IP
+    url = f"https://geolocation-db.com/json/{ip_address}"
     response = urllib.request.urlopen(url)
     encoding = response.info().get_content_charset('utf8')
     data = json.loads(response.read().decode(encoding))
+    
+    result = (None, None)
+    
     try:
         lat= float(data["latitude"])
         lon= float(data["longitude"])
-        if lat == 0.0 and lon == 0.0:
-            return (None, None)
-        return (lat,lon)
-    except:
-        return (None,None)
+        if lat != 0.0 and lon != 0.0:
+            result = (lat, lon)
+    except (ValueError, KeyError):
+        pass
+    
+    return result
 
-def printHelp():
-    print ("./vis_route.py IPv4Address")
-    print (" e.g. ./vis_route.py 213.138.111.222")
 
-try:
-    opts, args = getopt.getopt(sys.argv,"h")
-except getopt.GetoptError:
-    printHelp()
-    sys.exit()
-for opt, arg in opts:
-    if opt == '-h':
-        printHelp()
-        sys.exit()
-if len(args) != 2:
-    printHelp()
-    sys.exit()
-IP= args[1]
+def print_help():
+    print("./vis_route.py IPv4Address")
+    print(" e.g. ./vis_route.py 213.138.111.222")
+    
 
-#m.bluemarble()
-#m.drawcoastlines(color='r', linewidth=1.0)
-
-# OS detection Linux/Mac or Windows
-if platform.system() == 'Linux' or platform.system() == 'Darwin':
+def trace_route(ip_address: str) -> None:
+    if platform.system() in ('Linux', 'Darwin'):
+        command = f"traceroute -m 25 -n {ip_address}"
+    elif platform.system() == 'Windows':
+        tracert_path = Path('C:') / 'Windows' / 'System32' / 'TRACERT.exe'
+        # alt: tracert_path = Path(subprocess.run(['where.exe', 'tracert'], capture_output=True, encoding='utf-8').stdout.rstrip())
+        command = f"{tracert_path} -h 25 -d -4 {ip_address}"
+    else:
+        print("Sorry, this Python program does not have support for your current operating system!")
+        sys.exit(-1)
+    
     #Start traceroute command
-    proc = subprocess.Popen(["traceroute -m 25 -n "+IP], stdout=subprocess.PIPE, shell=True,universal_newlines=True)
+    proc = subprocess.Popen([command], stdout=subprocess.PIPE, shell=True,universal_newlines=True) 
+    
     #plot a pretty enough map
     fig = plt.figure(figsize=(10, 6), edgecolor='w')
-    m = Basemap(projection='mill', lon_0=0,resolution='l')
+    m = Basemap(projection='mill', lon_0=0, resolution='l')
     m.shadedrelief(scale=0.05)
+    
     #Where we are coming from
-    lastLon= None
-    lastLat= None
+    last_lon = None
+    last_lat = None
+    
     #Parse individual traceroute command lines
     for line in proc.stdout:
-        print(line,end="")
-        hopIP=line.split()[1]
-        if hopIP in ("*" , "to"):
+        print(line, end="")
+    
+        if platform.system() == 'Windows' and len(line.split()) != 8:
             continue
-        (lat,lon)=getLoc(hopIP)
+    
+        hop_ip = line.split()[1 if platform.system() in ('Linux', 'Darwin') else 7]
+    
+        if hop_ip in ("*" , "to"):
+            continue
+        
+        (lat, lon) = get_location(hop_ip)
+    
         if (lat is None):
             continue
-        if lastLat is not None and (lastLat-lat + lastLon-lon) != 0.0:
+        
+        if last_lat is not None and (last_lat-lat + last_lon-lon) != 0.0:
             #print(lastLat,lastLon,lat,lon)
-            x,y = m(lon,lat)
-            m.scatter(x,y,10,marker='o',color='r')
-            line, = m.drawgreatcircle(lastLon,lastLat,lon,lat,color='b')
-        lastLat= lat
-        lastLon= lon
+            x, y = m(lon,lat)
+            m.scatter(x, y, 10, marker='o', color='r')
+            line, = m.drawgreatcircle(last_lon, last_lat, lon, lat, color='b')
+        
+        last_lat = lat
+        last_lon = lon
 
     plt.tight_layout()
     plt.show()
 
-elif platform.system() == 'Windows':
-    proc = subprocess.Popen("C:\\Windows\\System32\\TRACERT.exe -h 25 -d -4 " + IP, stdout=subprocess.PIPE, shell=True, universal_newlines=True)
-    fig = plt.figure(figsize=(10, 6), edgecolor='w')
-    m = Basemap(projection='mill', lon_0=0,resolution='l')
-    m.shadedrelief(scale=0.05)
-    lastLon = None
-    lastLat = None
 
-    for line in proc.stdout:
-        print(line,end="")
-        if len(line.split()) != 8:
-            continue
-        else:
-            hopIP=line.split()[7]
-            if hopIP in ("*" , "to"):
-                continue
-            (lat,lon)=getLoc(hopIP)
-            if (lat is None):
-                continue
-            if lastLat is not None and (lastLat-lat + lastLon-lon) != 0.0:
-                x,y = m(lon,lat)
-                m.scatter(x,y,10,marker='o',color='r')
-                line, = m.drawgreatcircle(lastLon,lastLat,lon,lat,color='b')
-            lastLat = lat
-            lastLon = lon
-
-    plt.tight_layout()
-    plt.show()
-else:
-    print("Sorry, this python program does not have support for your current operating system!")
-    sys.exit(-1)
+def main():
+    
+    try:
+        opts, args = getopt.getopt(sys.argv, "h")
+    except getopt.GetoptError:
+        print_help()
+        return
+    
+    if len(args) != 2:
+        print_help()
+        return
+    
+    for opt, arg in opts:
+        if opt == '-h':
+            print_help()
+            return
+    
+    ip_address = args[1]
+    trace_route(ip_address)
+    
+if __name__ == '__main__':
+    main()
