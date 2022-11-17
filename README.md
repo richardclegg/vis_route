@@ -2,9 +2,9 @@
 
 This is a simple visualiser that takes information from traceroute and visualises it against a world map using geolocation. It should run on MacOS or windows.
 
-usage -- just give an IP address
+usage -- just give an IP address (e.g. university of toyko web server)
 
-./vis_route.py 123.45.67.89
+./vis_route.py 210.152.243.234
 
 
 You will need to install
