@@ -1,47 +1,54 @@
 # vis_route
 
-A simple visualiser that runs `traceroute` to a host and draws the route it
-takes across a world map, using IP geolocation for each hop. It runs on
-Linux, macOS and Windows.
+A simple visualiser that draws the route a `traceroute` takes across a world
+map, using IP geolocation for each hop. It runs entirely in the browser: there
+is nothing to install and no server.
 
 ## Usage
 
-Give it an IPv4 address or hostname (e.g. the University of Tokyo web server):
+1. Open `index.html` in a browser (double-clicking the file is enough), or
+   serve this folder from any static web host.
+2. Run a traceroute in a terminal, e.g. to the University of Tokyo web server:
 
-```
-./vis_route.py 210.152.243.234
-```
+   ```
+   traceroute -n 210.152.243.234      # Linux, macOS
+   tracert -d 210.152.243.234         # Windows
+   ```
 
-Options:
+3. Paste the output into the page and press **Plot route** (or Ctrl/⌘+Enter).
 
-```
-usage: vis_route.py [-h] [-m MAX_HOPS] [-o FILE] target
+A web page is not allowed to send the low-level packets traceroute needs, which
+is why the trace itself is run in a terminal. Output from Unix `traceroute`,
+Windows `tracert` and `mtr --report` is understood.
 
-  -m, --max-hops MAX_HOPS   maximum number of hops to probe (default: 25)
-  -o, --output FILE         save the map to FILE (e.g. route.png) instead of showing it
-```
+Each located hop is drawn as a dot, and consecutive hops are joined by great
+circles. Hops on private networks (e.g. `192.168.x.x`) and hops that do not
+answer are skipped. Scroll to zoom, drag to pan, and use **Save SVG** to
+download the map as `route.svg`.
 
-The traceroute output is echoed as it arrives, then the map window opens
-(or the file is written) once the trace finishes. Hops on private networks
-(e.g. `192.168.x.x`) and hops that do not answer are skipped.
+## Geolocation and privacy
 
-Geolocation uses https://geolocation-db.com; the accuracy of the plotted
-points is only as good as that database.
+The public IP addresses in the pasted output are sent from your browser to
+https://ipwho.is to look up their locations, falling back to
+https://geolocation-db.com if that is unreachable. Private addresses are never
+sent. The accuracy of the plotted points is only as good as those databases.
 
-## Installation
+To use a different service, edit `PROVIDERS` at the top of `vis_route.js`; it
+must be reachable over HTTPS and allow cross-origin requests (CORS).
 
-You need `traceroute` (Linux/macOS, usually in the `traceroute` package) or
-`tracert` (built into Windows), plus the Python dependencies:
+## Files
 
-```
-pip install -r requirements.txt
-```
-
-That installs [matplotlib](https://matplotlib.org/) and
-[basemap](https://matplotlib.org/basemap/) for drawing the map.
+- `index.html`, `style.css`, `app.js` – the page.
+- `vis_route.js` – parsing, geolocation and map geometry, with no dependency
+  on the page.
+- `world.js` – country outlines from
+  [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth data).
 
 ## Tests
 
+The tests need [Node.js](https://nodejs.org/) 20 or later and no other
+packages:
+
 ```
-python3 -m unittest test_vis_route
+npm test
 ```

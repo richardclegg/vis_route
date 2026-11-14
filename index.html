@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vis_route – traceroute on a world map</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>vis_route</h1>
+  <p>Draw the path of a traceroute on a world map.</p>
+</header>
+
+<main>
+  <section class="panel" aria-label="Traceroute input">
+    <label for="trace">Paste traceroute output</label>
+    <textarea id="trace" rows="12" spellcheck="false" placeholder="Run one of these in a terminal, then paste the output here:
+
+  traceroute -n example.com     (Linux, macOS)
+  tracert -d example.com        (Windows)
+
+ 1  192.168.1.1  0.412 ms  0.391 ms  0.384 ms
+ 2  * * *
+ 3  81.2.69.142  12.1 ms  12.3 ms  12.2 ms
+ ..."></textarea>
+    <div class="actions">
+      <button id="plot" type="button" class="primary">Plot route</button>
+      <button id="save" type="button" disabled>Save SVG</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <ol id="hops" aria-label="Located hops"></ol>
+    <p class="note">
+      A web page cannot run traceroute itself, so run it in a terminal and paste
+      the result. The public IP addresses of the hops are sent to
+      <a href="https://ipwho.is/" rel="noopener">ipwho.is</a> to look up their locations;
+      private addresses are never sent.
+    </p>
+  </section>
+
+  <section class="map-wrap" aria-label="Map">
+    <svg id="map" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="World map showing the route">
+      <style>
+        .ocean { fill: #dbe9f4; }
+        .land { fill: #f4f1e8; stroke: #b9b3a3; stroke-width: 0.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+        .route { fill: none; stroke: #1f5fd0; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+        .hop { fill: #d62828; stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
+        .hop.active { fill: #ffb703; }
+      </style>
+      <rect class="ocean" id="ocean"></rect>
+      <path class="land" id="land"></path>
+      <g id="routes"></g>
+      <g id="markers"></g>
+    </svg>
+    <div class="zoom" role="group" aria-label="Zoom">
+      <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+      <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+      <button id="zoom-fit" type="button" aria-label="Fit route" title="Fit route">⤢</button>
+    </div>
+  </section>
+</main>
+
+<script src="world.js"></script>
+<script src="vis_route.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
