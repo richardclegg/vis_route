@@ -270,12 +270,18 @@
 
     const ips = VisRoute.hopIps(traceInput.value);
     if (!ips.length) {
-      setStatus(
-        traceInput.value.trim()
-          ? "No hops found. Paste the full output of traceroute or tracert, including the numbered lines."
-          : "Paste the output of traceroute or tracert first.",
-        true
-      );
+      const target = VisRoute.bareTarget(traceInput.value);
+      let message = "Paste the output of traceroute or tracert first.";
+      if (target) {
+        // An address was typed in, as if the page could run the trace itself.
+        message =
+          target + " is a destination, not traceroute output. This page cannot run the trace for you: run " +
+          "\"traceroute -n " + target + "\" (Linux, macOS) or \"tracert -d " + target + "\" (Windows) " +
+          "in a terminal, then paste everything it prints here.";
+      } else if (traceInput.value.trim()) {
+        message = "No hops found. Paste the full output of traceroute or tracert, including the numbered lines.";
+      }
+      setStatus(message, true);
       return;
     }
 

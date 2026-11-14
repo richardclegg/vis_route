@@ -227,3 +227,14 @@ test("unwrapRing: a ring circling the south pole is closed along the pole", () =
   assert.equal(wraps, true);
   assert.deepEqual(points.slice(-3), [[180, -80], [180, -90], [-180, -90]]);
 });
+
+test("bareTarget: recognises a lone address or hostname", () => {
+  assert.equal(VisRoute.bareTarget("8.8.8.8"), "8.8.8.8");
+  assert.equal(VisRoute.bareTarget("  example.com\n"), "example.com");
+});
+
+test("bareTarget: traceroute output and other text are not a target", () => {
+  for (const text of ["", " 1  8.8.8.8  1 ms", "hello", "two words.com x", "8.8.8.8\n1.1.1.1", "<b>.com"]) {
+    assert.equal(VisRoute.bareTarget(text), null, text);
+  }
+});

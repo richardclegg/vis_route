@@ -368,9 +368,23 @@
     return { hops, total: ips.length, skipped };
   }
 
+  /**
+   * If `text` is just a destination (an IPv4 address or a hostname) rather
+   * than traceroute output, return that destination; otherwise null.
+   * @param {string} text
+   * @returns {string | null}
+   */
+  function bareTarget(text) {
+    const target = text.trim();
+    if (ipToInt(target) !== null) return target;
+    // Labels of letters, digits and hyphens joined by at least one dot.
+    return /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(target) ? target : null;
+  }
+
   const api = {
     PROVIDERS,
     hopIps,
+    bareTarget,
     isPublic,
     createLocator,
     locateHops,
