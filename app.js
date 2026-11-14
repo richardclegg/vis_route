@@ -1,3 +1,4 @@
+// @ts-check
 /* Page behaviour for vis_route: wires the form to the map. */
 (function () {
   "use strict";
@@ -11,22 +12,42 @@
   const HEIGHT = project.height;
   const locate = VisRoute.createLocator({ onWarning: (message) => console.warn(message) });
 
-  const $ = (id) => document.getElementById(id);
-  const map = $("map");
-  const traceInput = $("trace");
-  const plotButton = $("plot");
-  const saveButton = $("save");
-  const statusLine = $("status");
-  const hopList = $("hops");
-  const routesLayer = $("routes");
-  const markersLayer = $("markers");
+  /** A rectangle of the map, in the SVG's own coordinates. @typedef {{x: number, y: number, w: number, h: number}} View */
 
+  /**
+   * Find an element of the page by id, checking that it is of the expected kind.
+   * @template {Element} T
+   * @param {string} id
+   * @param {new () => T} type
+   * @returns {T}
+   */
+  function $(id, type) {
+    const element = document.getElementById(id);
+    if (!(element instanceof type)) throw new Error("index.html has no " + type.name + " with id " + id);
+    return element;
+  }
+
+  const map = $("map", SVGSVGElement);
+  const traceInput = $("trace", HTMLTextAreaElement);
+  const plotButton = $("plot", HTMLButtonElement);
+  const saveButton = $("save", HTMLButtonElement);
+  const statusLine = $("status", HTMLElement);
+  const hopList = $("hops", HTMLElement);
+  const routesLayer = $("routes", SVGGElement);
+  const markersLayer = $("markers", SVGGElement);
+
+  /** @type {View} */
   let view = { x: 0, y: 0, w: WIDTH, h: HEIGHT };
+  /** @type {Hop[]} */
   let currentHops = [];
   let run = 0; // identifies the latest "Plot route" click
 
   // ---------------------------------------------------------------- map --
 
+  /**
+   * SVG path data for a line through the given places.
+   * @param {LonLat[]} points
+   */
   function pathData(points) {
     return points
       .map(([lon, lat], i) => {
@@ -37,9 +58,10 @@
   }
 
   function drawWorld() {
-    const ocean = $("ocean");
-    ocean.setAttribute("width", WIDTH);
-    ocean.setAttribute("height", HEIGHT);
+    const ocean = $("ocean", SVGRectElement);
+    ocean.setAttribute("width", String(WIDTH));
+    ocean.setAttribute("height", String(HEIGHT));
+    /** @type {(points: LonLat[], degrees: number) => LonLat[]} */
     const shifted = (points, degrees) => points.map(([lon, lat]) => [lon + degrees, lat]);
     let d = "";
     for (const ring of VisRoute.topologyRings(WORLD_TOPOLOGY, "countries")) {
@@ -47,9 +69,10 @@
       // A shape crossing the 180° meridian shows up at both edges of the map.
       for (const degrees of wraps ? [-360, 0, 360] : [0]) d += pathData(shifted(points, degrees)) + "Z";
     }
-    $("land").setAttribute("d", d);
+    $("land", SVGPathElement).setAttribute("d", d);
   }
 
+  /** @param {View} next */
   function setView(next) {
     const w = Math.min(WIDTH, Math.max(WIDTH / MAX_ZOOM, next.w));
     const h = (w * HEIGHT) / WIDTH;
@@ -65,9 +88,13 @@
     map.setAttribute("viewBox", [view.x, view.y, view.w, view.h].join(" "));
     // Markers keep the same on-screen size at every zoom level.
     const radius = (HOP_RADIUS * view.w) / WIDTH;
-    for (const marker of markersLayer.children) marker.setAttribute("r", radius);
+    for (const marker of markersLayer.children) marker.setAttribute("r", String(radius));
   }
 
+  /**
+   * @param {number} factor below 1 zooms in, above 1 zooms out
+   * @param {{x: number, y: number}} [centre] the point to keep in place
+   */
   function zoomBy(factor, centre) {
     const c = centre || { x: view.x + view.w / 2, y: view.y + view.h / 2 };
     const w = Math.min(WIDTH, Math.max(WIDTH / MAX_ZOOM, view.w * factor));
@@ -101,6 +128,7 @@
     setView({ x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w, h });
   }
 
+  /** @param {MouseEvent} event */
   function svgPoint(event) {
     const rect = map.getBoundingClientRect();
     return {
@@ -119,6 +147,7 @@
       { passive: false }
     );
 
+    /** @type {{clientX: number, clientY: number, x: number, y: number} | null} */
     let drag = null;
     map.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -143,17 +172,22 @@
     map.addEventListener("pointerup", endDrag);
     map.addEventListener("pointercancel", endDrag);
 
-    $("zoom-in").addEventListener("click", () => zoomBy(0.6));
-    $("zoom-out").addEventListener("click", () => zoomBy(1 / 0.6));
-    $("zoom-fit").addEventListener("click", fitRoute);
+    $("zoom-in", HTMLButtonElement).addEventListener("click", () => zoomBy(0.6));
+    $("zoom-out", HTMLButtonElement).addEventListener("click", () => zoomBy(1 / 0.6));
+    $("zoom-fit", HTMLButtonElement).addEventListener("click", fitRoute);
   }
 
   // -------------------------------------------------------------- route --
 
+  /** @param {Hop} hop */
   function describe(hop) {
     return hop.label ? hop.ip + " – " + hop.label : hop.ip;
   }
 
+  /**
+   * @param {number} index
+   * @param {boolean} active
+   */
   function setActive(index, active) {
     const marker = markersLayer.children[index];
     const item = hopList.children[index];
@@ -161,6 +195,11 @@
     if (item) item.classList.toggle("active", active);
   }
 
+  /**
+   * Draw the newest hop: its marker, the line from the previous hop and its list entry.
+   * @param {Hop} hop
+   * @param {Hop[]} hops all hops located so far, ending with `hop`
+   */
   function addHop(hop, hops) {
     const index = hops.length - 1;
     const previous = hops[index - 1];
@@ -180,7 +219,7 @@
     marker.setAttribute("class", "hop");
     marker.setAttribute("cx", x.toFixed(2));
     marker.setAttribute("cy", y.toFixed(2));
-    marker.setAttribute("r", (HOP_RADIUS * view.w) / WIDTH);
+    marker.setAttribute("r", String((HOP_RADIUS * view.w) / WIDTH));
     const title = document.createElementNS(SVG_NS, "title");
     title.textContent = index + 1 + ". " + describe(hop);
     marker.appendChild(title);
@@ -207,6 +246,10 @@
     item.addEventListener("blur", () => setActive(index, false));
   }
 
+  /**
+   * @param {string} message
+   * @param {boolean} [isError]
+   */
   function setStatus(message, isError) {
     statusLine.textContent = message;
     statusLine.classList.toggle("error", Boolean(isError));
@@ -240,6 +283,7 @@
     setStatus("Locating " + ips.length + " hops…");
     try {
       // Hops are only drawn while this is still the latest run.
+      /** @type {(hop: Hop, hops: Hop[]) => void} */
       const onHop = (hop, hops) => {
         if (thisRun !== run) return;
         currentHops = hops;
@@ -270,14 +314,14 @@
   }
 
   function saveSvg() {
-    const copy = map.cloneNode(true);
+    const copy = /** @type {SVGSVGElement} */ (map.cloneNode(true));
     copy.setAttribute("viewBox", [0, 0, WIDTH, HEIGHT].join(" "));
-    copy.setAttribute("width", WIDTH);
-    copy.setAttribute("height", Math.round(HEIGHT));
+    copy.setAttribute("width", String(WIDTH));
+    copy.setAttribute("height", String(Math.round(HEIGHT)));
     copy.removeAttribute("id");
     copy.removeAttribute("class");
     for (const marker of copy.querySelectorAll(".hop")) {
-      marker.setAttribute("r", HOP_RADIUS);
+      marker.setAttribute("r", String(HOP_RADIUS));
       marker.classList.remove("active");
     }
     const source = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(copy);

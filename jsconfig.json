@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "CommonJS",
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["vis_route.js", "app.js", "globals.d.ts"]
+}

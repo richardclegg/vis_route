@@ -43,8 +43,12 @@ must be reachable over HTTPS and allow cross-origin requests (CORS).
   on the page.
 - `world.js` – country outlines from
   [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth data).
+- `globals.d.ts`, `jsconfig.json` – type declarations and settings for the
+  type check; the browser never loads them.
 
-## Tests
+## Development
+
+The page is plain JavaScript with no build step: edit a file and reload.
 
 The tests need [Node.js](https://nodejs.org/) 20 or later and no other
 packages:
@@ -52,3 +56,15 @@ packages:
 ```
 npm test
 ```
+
+The scripts are also type-checked by the TypeScript compiler, using the JSDoc
+comments in the code and the types in `globals.d.ts`. This needs a one-off
+`npm install`:
+
+```
+npm install
+npm run typecheck
+```
+
+Editors with TypeScript support (such as VS Code) show the same errors as you
+type.

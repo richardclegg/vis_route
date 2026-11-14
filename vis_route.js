@@ -1,18 +1,15 @@
+// @ts-check
 /*
  * vis_route core: parse traceroute output, geolocate hops and compute the
  * geometry needed to draw the route on a world map.
  *
  * Nothing in this file touches the DOM, so it runs unchanged in the browser
  * (as the global `VisRoute`) and in Node (via `require`), where it is tested.
+ *
+ * The types named in the JSDoc comments are declared in globals.d.ts and
+ * checked by `npm run typecheck`.
  */
-(function (root, factory) {
-  const api = factory();
-  if (typeof module === "object" && module.exports) {
-    module.exports = api;
-  } else {
-    root.VisRoute = api;
-  }
-})(typeof self !== "undefined" ? self : this, function () {
+(function () {
   "use strict";
 
   const GEOLOCATION_TIMEOUT = 10000; // milliseconds
@@ -20,6 +17,7 @@
   // Geolocation services, tried in order until one answers. Each must be
   // reachable over HTTPS and send CORS headers, as the lookup is made
   // directly from the page.
+  /** @type {Provider[]} */
   const PROVIDERS = [
     {
       name: "ipwho.is",
@@ -46,7 +44,8 @@
   const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 
   // Address blocks that are not globally routable: [network, prefix length].
-  const NON_PUBLIC_BLOCKS = [
+  /** @type {[network: string, bits: number][]} */
+  const NON_PUBLIC_BLOCKS_TEXT = [
     ["0.0.0.0", 8],
     ["10.0.0.0", 8],
     ["100.64.0.0", 10],
@@ -61,9 +60,15 @@
     ["203.0.113.0", 24],
     ["224.0.0.0", 4],
     ["240.0.0.0", 4],
-  ].map(([network, bits]) => [ipToInt(network), bits]);
+  ];
+  /** @type {[network: number, bits: number][]} */
+  const NON_PUBLIC_BLOCKS = NON_PUBLIC_BLOCKS_TEXT.map(([network, bits]) => [ipToInt(network) ?? 0, bits]);
 
-  /** Return the address as an unsigned 32-bit integer, or null if invalid. */
+  /**
+   * Return the address as an unsigned 32-bit integer, or null if invalid.
+   * @param {string} ip
+   * @returns {number | null}
+   */
   function ipToInt(ip) {
     const parts = String(ip).split(".");
     if (parts.length !== 4) return null;
@@ -77,7 +82,11 @@
     return value;
   }
 
-  /** True if `ip` is a globally routable IPv4 address worth geolocating. */
+  /**
+   * True if `ip` is a globally routable IPv4 address worth geolocating.
+   * @param {string} ip
+   * @returns {boolean}
+   */
   function isPublic(ip) {
     const value = ipToInt(ip);
     if (value === null) return false;
@@ -92,6 +101,8 @@
    * Accepts the whole output as one string or as an array of lines, from
    * Unix traceroute, Windows tracert or an mtr report. Hops where every
    * probe timed out ("* * *" / "Request timed out.") yield nothing.
+   * @param {string | string[]} output
+   * @returns {string[]}
    */
   function hopIps(output) {
     const lines = Array.isArray(output) ? output : String(output).split(/\r?\n/);
@@ -104,6 +115,14 @@
     return ips;
   }
 
+  /**
+   * Build a place from the loosely typed fields of a service's answer.
+   * @param {unknown} latitude
+   * @param {unknown} longitude
+   * @param {unknown} city
+   * @param {unknown} country
+   * @returns {Place | null}
+   */
   function toPlace(latitude, longitude, city, country) {
     if (latitude === null || latitude === undefined || latitude === "") return null;
     const lat = Number(latitude);
@@ -121,15 +140,22 @@
    * Private, loopback and other non-public addresses are never looked up.
    * Results are cached so repeated hops cost one request each. `fetchImpl`
    * and `onWarning` can be replaced for testing.
+   * @param {LocatorOptions} [options]
+   * @returns {Locate}
    */
   function createLocator(options) {
     const opts = options || {};
-    const fetchImpl = opts.fetch || ((...args) => fetch(...args));
+    const fetchImpl = opts.fetch || ((url, init) => fetch(url, init));
     const providers = opts.providers || PROVIDERS;
     const timeout = opts.timeout || GEOLOCATION_TIMEOUT;
     const onWarning = opts.onWarning || (() => {});
+    /** @type {Map<string, Promise<Place | null>>} */
     const cache = new Map();
 
+    /**
+     * @param {string} ip
+     * @returns {Promise<Place | null>}
+     */
     async function lookup(ip) {
       for (const provider of providers) {
         const controller = new AbortController();
@@ -139,7 +165,8 @@
           if (!response.ok) throw new Error("HTTP " + response.status);
           return provider.parse(await response.json());
         } catch (error) {
-          onWarning("geolocation lookup failed for " + ip + " at " + provider.name + ": " + error.message);
+          const reason = error instanceof Error ? error.message : String(error);
+          onWarning("geolocation lookup failed for " + ip + " at " + provider.name + ": " + reason);
         } finally {
           clearTimeout(timer);
         }
@@ -149,8 +176,12 @@
 
     return function locate(ip) {
       if (!isPublic(ip)) return Promise.resolve(null);
-      if (!cache.has(ip)) cache.set(ip, lookup(ip));
-      return cache.get(ip);
+      let result = cache.get(ip);
+      if (!result) {
+        result = lookup(ip);
+        cache.set(ip, result);
+      }
+      return result;
     };
   }
 
@@ -158,10 +189,17 @@
    * Return [lon, lat] points along the great circle between two places.
    *
    * Uses spherical linear interpolation; longitudes are in [-180, 180].
+   * @param {number} lon1
+   * @param {number} lat1
+   * @param {number} lon2
+   * @param {number} lat2
+   * @param {number} [npoints] number of steps along the path (default 200)
+   * @returns {LonLat[]}
    */
   function greatCirclePoints(lon1, lat1, lon2, lat2, npoints) {
     const n = npoints || 200;
     const rad = Math.PI / 180;
+    /** @type {(lon: number, lat: number) => [number, number, number]} */
     const toVector = (lon, lat) => [
       Math.cos(lat * rad) * Math.cos(lon * rad),
       Math.cos(lat * rad) * Math.sin(lon * rad),
@@ -177,6 +215,7 @@
         [lon2, lat2],
       ];
     }
+    /** @type {LonLat[]} */
     const points = [];
     for (let step = 0; step <= n; step++) {
       const t = step / n;
@@ -190,8 +229,13 @@
     return points;
   }
 
-  /** Split a [lon, lat] path into pieces wherever it crosses the 180° meridian. */
+  /**
+   * Split a [lon, lat] path into pieces wherever it crosses the 180° meridian.
+   * @param {LonLat[]} points
+   * @returns {LonLat[][]}
+   */
   function splitAtDateline(points) {
+    /** @type {LonLat[][]} */
     const segments = points.length ? [[points[0]]] : [];
     for (let i = 1; i < points.length; i++) {
       if (Math.abs(points[i][0] - points[i - 1][0]) > 180) segments.push([]);
@@ -204,20 +248,25 @@
    * Miller cylindrical projection (the one the original Basemap version
    * used). Returns a function mapping (lon, lat) in degrees to [x, y] in a
    * `width`-wide image, with `project.height` giving the image height.
+   * @param {number} width
+   * @returns {Projection}
    */
   function millerProjection(width) {
     const rad = Math.PI / 180;
     const scale = width / (2 * Math.PI);
-    const millerY = (lat) => 1.25 * Math.log(Math.tan(Math.PI / 4 + 0.4 * lat * rad));
+    const millerY = (/** @type {number} */ lat) => 1.25 * Math.log(Math.tan(Math.PI / 4 + 0.4 * lat * rad));
     const top = millerY(90);
+    /** @type {(lon: number, lat: number) => [number, number]} */
     const project = (lon, lat) => [(lon * rad + Math.PI) * scale, (top - millerY(lat)) * scale];
-    project.height = 2 * top * scale;
-    return project;
+    return Object.assign(project, { height: 2 * top * scale });
   }
 
   /**
    * Decode one object of a TopoJSON topology into a flat list of polygon
    * rings, each an array of [lon, lat] points.
+   * @param {Topology} topology
+   * @param {string} objectName
+   * @returns {LonLat[][]}
    */
   function topologyRings(topology, objectName) {
     const { scale, translate } = topology.transform || { scale: [1, 1], translate: [0, 0] };
@@ -227,11 +276,13 @@
       return arc.map(([dx, dy]) => {
         x += dx;
         y += dy;
-        return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
+        return /** @type {LonLat} */ ([x * scale[0] + translate[0], y * scale[1] + translate[1]]);
       });
     });
 
+    /** @param {number[]} arcIndexes */
     function ring(arcIndexes) {
+      /** @type {LonLat[]} */
       const points = [];
       for (const index of arcIndexes) {
         const arc = index < 0 ? arcs[~index].slice().reverse() : arcs[index];
@@ -241,7 +292,9 @@
       return points;
     }
 
+    /** @type {LonLat[][]} */
     const rings = [];
+    /** @param {TopoGeometry} geometry */
     function collect(geometry) {
       if (geometry.type === "GeometryCollection") {
         geometry.geometries.forEach(collect);
@@ -262,6 +315,8 @@
    * ring that circles a pole, like Antarctica, is closed along that pole.
    * Returns `{points, wraps}`; when `wraps` is true the ring must also be
    * drawn shifted by ±360° to appear at both edges of the map.
+   * @param {LonLat[]} ring
+   * @returns {{points: LonLat[], wraps: boolean}}
    */
   function unwrapRing(ring) {
     let offset = 0;
@@ -274,7 +329,7 @@
           wraps = true;
         }
       }
-      return [lon + offset, lat];
+      return /** @type {LonLat} */ ([lon + offset, lat]);
     });
     if (points.length && Math.abs(offset) > 180) {
       const pole = points.reduce((sum, p) => sum + p[1], 0) < 0 ? -90 : 90;
@@ -289,8 +344,13 @@
    * Returns `{hops, total, skipped}` where `hops` is a list of
    * `{ip, lat, lon, label}` with consecutive hops that resolve to the same
    * coordinates collapsed into one. `onHop` is called as each hop is added.
+   * @param {string[]} ips
+   * @param {Locate} locate
+   * @param {(hop: Hop, hops: Hop[]) => void} [onHop]
+   * @returns {Promise<{hops: Hop[], total: number, skipped: number}>}
    */
   async function locateHops(ips, locate, onHop) {
+    /** @type {Hop[]} */
     const hops = [];
     let skipped = 0;
     for (const ip of ips) {
@@ -308,7 +368,7 @@
     return { hops, total: ips.length, skipped };
   }
 
-  return {
+  const api = {
     PROVIDERS,
     hopIps,
     isPublic,
@@ -320,4 +380,10 @@
     topologyRings,
     unwrapRing,
   };
-});
+
+  if (typeof module === "object" && module.exports) {
+    module.exports = api;
+  } else {
+    Object.assign(globalThis, { VisRoute: api });
+  }
+})();
