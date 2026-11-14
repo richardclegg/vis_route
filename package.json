@@ -1,0 +1,15 @@
+{
+  "name": "vis_route",
+  "version": "2.0.0",
+  "description": "Draw the path of a traceroute on a world map, in the browser.",
+  "private": true,
+  "license": "GPL-3.0",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
