@@ -22,8 +22,12 @@ is why the trace itself is run in a terminal. Output from Unix `traceroute`,
 Windows `tracert` and `mtr --report` is understood.
 
 Each located hop is drawn as a dot, and consecutive hops are joined by great
-circles. Hops on private networks (e.g. `192.168.x.x`) and hops that do not
-answer are skipped. Scroll to zoom, drag to pan, and use **Save SVG** to
+circles. Hops on private networks (e.g. `192.168.x.x` or an ISP's internal
+`100.64.x.x` range) and hops that do not answer are skipped, and consecutive
+hops that the geolocation service places at the same spot share one dot, so a
+route usually shows fewer dots than it has hops. The line under the buttons
+says how many hops fell into each group, and the list shows every address
+behind each dot. Scroll to zoom, drag to pan, and use **Save SVG** to
 download the map as `route.svg`.
 
 ## Geolocation and privacy

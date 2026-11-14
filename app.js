@@ -181,7 +181,47 @@
 
   /** @param {Hop} hop */
   function describe(hop) {
-    return hop.label ? hop.ip + " – " + hop.label : hop.ip;
+    const addresses = hop.ips.join(", ");
+    return hop.label ? addresses + " – " + hop.label : addresses;
+  }
+
+  /**
+   * Show the addresses and place of a hop in its marker tooltip and list entry.
+   * @param {Hop} hop
+   * @param {number} index
+   */
+  function labelHop(hop, index) {
+    const title = markersLayer.children[index]?.querySelector("title");
+    if (title) title.textContent = index + 1 + ". " + describe(hop);
+
+    const text = hopList.children[index]?.firstElementChild;
+    if (!text) return;
+    const lines = hop.ips.map((address) => {
+      const line = document.createElement("span");
+      line.className = "ip";
+      line.textContent = address;
+      return line;
+    });
+    const place = document.createElement("span");
+    place.className = "place";
+    place.textContent = hop.label || hop.lat.toFixed(2) + ", " + hop.lon.toFixed(2);
+    text.replaceChildren(...lines, place);
+  }
+
+  /**
+   * "3 locations from 9 hops: 3 on private networks, …"
+   * @param {LocatedRoute} result
+   */
+  function summarise(result) {
+    const places = result.hops.length;
+    const reasons = [];
+    if (result.private) reasons.push(result.private + " on private networks");
+    if (result.unlocated) reasons.push(result.unlocated + " could not be located");
+    if (result.merged) reasons.push(result.merged + " at the same location as the hop before");
+    return (
+      places + " location" + (places === 1 ? "" : "s") + " from " + result.total + " hops" +
+      (reasons.length ? ": " + reasons.join(", ") : "") + "."
+    );
   }
 
   /**
@@ -220,23 +260,14 @@
     marker.setAttribute("cx", x.toFixed(2));
     marker.setAttribute("cy", y.toFixed(2));
     marker.setAttribute("r", String((HOP_RADIUS * view.w) / WIDTH));
-    const title = document.createElementNS(SVG_NS, "title");
-    title.textContent = index + 1 + ". " + describe(hop);
-    marker.appendChild(title);
+    marker.appendChild(document.createElementNS(SVG_NS, "title"));
     markersLayer.appendChild(marker);
 
     const item = document.createElement("li");
     item.tabIndex = 0;
-    const text = document.createElement("span");
-    const ip = document.createElement("span");
-    ip.className = "ip";
-    ip.textContent = hop.ip;
-    const place = document.createElement("span");
-    place.className = "place";
-    place.textContent = hop.label || hop.lat.toFixed(2) + ", " + hop.lon.toFixed(2);
-    text.append(ip, place);
-    item.appendChild(text);
+    item.appendChild(document.createElement("span"));
     hopList.appendChild(item);
+    labelHop(hop, index);
 
     for (const element of [marker, item]) {
       element.addEventListener("pointerenter", () => setActive(index, true));
@@ -289,11 +320,12 @@
     setStatus("Locating " + ips.length + " hops…");
     try {
       // Hops are only drawn while this is still the latest run.
-      /** @type {(hop: Hop, hops: Hop[]) => void} */
-      const onHop = (hop, hops) => {
+      /** @type {(hop: Hop, hops: Hop[], isNew: boolean) => void} */
+      const onHop = (hop, hops, isNew) => {
         if (thisRun !== run) return;
         currentHops = hops;
-        addHop(hop, hops);
+        if (isNew) addHop(hop, hops);
+        else labelHop(hop, hops.length - 1);
         setStatus("Locating " + ips.length + " hops… " + hops.length + " found");
       };
       const result = await VisRoute.locateHops(ips, locate, onHop);
@@ -309,9 +341,7 @@
         );
         return;
       }
-      let summary = result.hops.length + " location" + (result.hops.length === 1 ? "" : "s") + " from " + result.total + " hops";
-      if (result.skipped) summary += "; " + result.skipped + " private or unlocatable";
-      setStatus(summary + ".");
+      setStatus(summarise(result));
       saveButton.disabled = false;
       fitRoute();
     } finally {

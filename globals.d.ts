@@ -14,7 +14,24 @@ interface Place {
 
 /** A geolocated hop of the route. */
 interface Hop extends Place {
+  /** The first address found at this place. */
   ip: string;
+  /** Every consecutive hop address found at this place, starting with `ip`. */
+  ips: string[];
+}
+
+/** The outcome of locating the hops of a trace. */
+interface LocatedRoute {
+  /** One entry per place, in route order. */
+  hops: Hop[];
+  /** Number of answering hops in the trace. */
+  total: number;
+  /** Hops on private networks, which are never looked up. */
+  private: number;
+  /** Public hops the geolocation services could not place. */
+  unlocated: number;
+  /** Hops at the same place as the hop before them, merged into it. */
+  merged: number;
 }
 
 /** A geolocation service that can be queried directly from the page. */

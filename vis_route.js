@@ -341,31 +341,39 @@
   /**
    * Geolocate the hops of a trace, in order.
    *
-   * Returns `{hops, total, skipped}` where `hops` is a list of
-   * `{ip, lat, lon, label}` with consecutive hops that resolve to the same
-   * coordinates collapsed into one. `onHop` is called as each hop is added.
+   * Consecutive hops that resolve to the same coordinates become a single
+   * entry of `hops` listing all their addresses, since they would be drawn
+   * on top of each other. The result also counts why hops did not get an
+   * entry of their own. `onHop` is called each time an entry is added
+   * (`isNew` true) or gains an address (`isNew` false).
    * @param {string[]} ips
    * @param {Locate} locate
-   * @param {(hop: Hop, hops: Hop[]) => void} [onHop]
-   * @returns {Promise<{hops: Hop[], total: number, skipped: number}>}
+   * @param {(hop: Hop, hops: Hop[], isNew: boolean) => void} [onHop]
+   * @returns {Promise<LocatedRoute>}
    */
   async function locateHops(ips, locate, onHop) {
     /** @type {Hop[]} */
     const hops = [];
-    let skipped = 0;
+    const result = { hops, total: ips.length, private: 0, unlocated: 0, merged: 0 };
     for (const ip of ips) {
       const place = await locate(ip);
       if (!place) {
-        skipped++;
+        if (isPublic(ip)) result.unlocated++;
+        else result.private++;
         continue;
       }
       const last = hops[hops.length - 1];
-      if (last && last.lat === place.lat && last.lon === place.lon) continue;
-      const hop = { ip, lat: place.lat, lon: place.lon, label: place.label };
+      if (last && last.lat === place.lat && last.lon === place.lon) {
+        result.merged++;
+        if (!last.ips.includes(ip)) last.ips.push(ip);
+        if (onHop) onHop(last, hops, false);
+        continue;
+      }
+      const hop = { ip, ips: [ip], lat: place.lat, lon: place.lon, label: place.label };
       hops.push(hop);
-      if (onHop) onHop(hop, hops);
+      if (onHop) onHop(hop, hops, true);
     }
-    return { hops, total: ips.length, skipped };
+    return result;
   }
 
   /**

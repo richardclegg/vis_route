@@ -108,7 +108,7 @@ button:focus-visible, textarea:focus-visible, #hops li:focus-visible { outline: 
 
 #hops li::before { content: counter(hop); color: var(--muted); font-variant-numeric: tabular-nums; }
 #hops li.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-#hops .ip { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+#hops .ip { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
 #hops .place { display: block; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 
 .note { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
